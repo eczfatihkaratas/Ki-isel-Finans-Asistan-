@@ -148,11 +148,15 @@ def rapor_hazirla():
     
     rapor += "🏛 **AYAK 1 & 3 (ABD & OPSİYON):**\n"
     rapor += zeki_analiz_yap("VOO", "S&P 500 ETF")
+    time.sleep(2) # Yahoo'yu yormamak için 2 saniye nefes al
     rapor += zeki_analiz_yap("AAPL", "Apple Inc.")
+    time.sleep(2)
     
     rapor += "\n🛡 **AYAK 2 (GÜVENLİ LİMAN):**\n"
     rapor += zeki_analiz_yap("GC=F", "Altın (Ons)")
+    time.sleep(2)
     rapor += zeki_analiz_yap("TLT", "ABD 20Y Tahvil")
+    time.sleep(2)
     
     rapor += "\n🇹🇷 **AYAK 4 (LOKAL FIRSAT):**\n"
     rapor += zeki_analiz_yap("XU100.IS", "BIST 100")
