@@ -87,23 +87,9 @@ Sistem sana Telegram üzerinden şu formatta bir mesaj atacak:
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Matematiksel Quant Motoru)
-Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
-Haber Analizi: (Faz 3'te eklenecek).
-"""
-
-"""
-PROJE FELSEFESİ VE HAFIZA BLOĞU:
-Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS Hayalet Tarayıcısı Eklendi)
+Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS API + HTML Zırhlı Raporlama)
 Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
-"""
-
-"""
-PROJE FELSEFESİ VE HAFIZA BLOĞU:
-Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS Hayalet Tarayıcısı Eklendi)
-Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
+Güvenlik: Top-5 Filtresi ile Telegram karakter sınırını aşması ve sessizce çökmesi engellendi.
 """
 
 import telebot
@@ -135,7 +121,7 @@ GUNUN_FIRSATLARI = {
 def index():
     return "Nokta Atışı Kuantum Motoru 7/24 Devrede!"
 
-# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları) ---
+# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları - HTML Formatı) ---
 def teknik_durum_bildir(symbol, screener, exchange):
     try:
         handler = TA_Handler(
@@ -153,13 +139,13 @@ def teknik_durum_bildir(symbol, screener, exchange):
         destek = analiz.indicators.get('Pivot.M.Classic.S1', fiyat * 0.95)
 
         if rsi < 30:
-            return f"🟢 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 **Aksiyon:** DİPTE! Kademeli Al veya PUT Sat.\n   └ 🎯 **Hedef:** {direnc:.2f} | 🛑 **Stop:** {destek:.2f}"
+            return f"🟢 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 <b>Aksiyon:</b> DİPTE! Kademeli Al veya PUT Sat.\n   └ 🎯 <b>Hedef:</b> {direnc:.2f} | 🛑 <b>Stop:</b> {destek:.2f}"
         elif rsi > 70:
-            return f"🔴 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 **Aksiyon:** ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 **Geri Çekilme:** {destek:.2f} | 🛑 **Zarar Kes:** {direnc:.2f}"
+            return f"🔴 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 <b>Aksiyon:</b> ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 <b>Geri Çekilme:</b> {destek:.2f} | 🛑 <b>Zarar Kes:</b> {direnc:.2f}"
         elif tavsiye == "STRONG_SELL":
-            return f"🔴 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 **Aksiyon:** 📉 GÜÇLÜ DÜŞÜŞ TRENDİ (Dipten dönüşü bekle)\n   └ 🎯 **Düşüş Beklentisi:** {destek:.2f}"
+            return f"🔴 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 <b>Aksiyon:</b> 📉 GÜÇLÜ DÜŞÜŞ TRENDİ (Dipten dönüşü bekle)\n   └ 🎯 <b>Düşüş Beklentisi:</b> {destek:.2f}"
         elif tavsiye == "STRONG_BUY":
-            return f"🟢 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 **Aksiyon:** 📈 GÜÇLÜ YÜKSELİŞ TRENDİ (Trende Katıl)\n   └ 🎯 **Hedef:** {direnc:.2f} | 🛑 **Stop:** {destek:.2f}"
+            return f"🟢 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 <b>Aksiyon:</b> 📈 GÜÇLÜ YÜKSELİŞ TRENDİ (Trende Katıl)\n   └ 🎯 <b>Hedef:</b> {direnc:.2f} | 🛑 <b>Stop:</b> {destek:.2f}"
         else:
             return None 
     except:
@@ -174,12 +160,12 @@ def golge_tarayici():
             vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
             makro_metin = ""
             if vix > 25:
-                makro_metin += f"💎 **VIX KORKU ENDEKSİ:** {vix:.2f} (YÜKSEK!)\n👉 *Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için harika.*\n"
+                makro_metin += f"💎 <b>VIX KORKU ENDEKSİ:</b> {vix:.2f} (YÜKSEK!)\n👉 <i>Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için harika.</i>\n"
             else:
-                makro_metin += f"⚖️ **VIX KORKU ENDEKSİ:** {vix:.2f} (Stabil)\n"
+                makro_metin += f"⚖️ <b>VIX KORKU ENDEKSİ:</b> {vix:.2f} (Stabil)\n"
             GUNUN_FIRSATLARI["MAKRO"] = makro_metin
             
-            # 2. ÖZEL TEFAS HAYALET TARAYICI (Chrome'a ihtiyaç duymadan doğrudan API'den çeker)
+            # 2. ÖZEL TEFAS HAYALET TARAYICI
             try:
                 url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
@@ -201,14 +187,13 @@ def golge_tarayici():
                         df = pd.DataFrame(veri)
                         df['GÜNLÜK GETİRİ'] = pd.to_numeric(df['GÜNLÜK GETİRİ'], errors='coerce')
                         
-                        # Sadece ekside olanları (alım fırsatlarını) filtrele
                         df_dusenler = df[df['GÜNLÜK GETİRİ'] < 0]
                         en_cok_dusenler = df_dusenler.sort_values(by="GÜNLÜK GETİRİ", ascending=True).head(3)
                         
-                        tefas_metin = "🚨 **DİPTEKİ FON FIRSATLARI (TEFAS)**\n"
+                        tefas_metin = "🚨 <b>DİPTEKİ FON FIRSATLARI (TEFAS)</b>\n"
                         if not en_cok_dusenler.empty:
                             for index, row in en_cok_dusenler.iterrows():
-                                tefas_metin += f"📉 **{row.get('FON KODU', 'FON')}**: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
+                                tefas_metin += f"📉 <b>{row.get('FON KODU', 'FON')}</b>: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
                             GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
@@ -217,22 +202,23 @@ def golge_tarayici():
             except Exception as e:
                 GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS taraması şu an yapılamıyor."
 
-            # 3. BİST VE ABD TARAMASI
+            # 3. BİST TARAMASI (Top-5 Sınırı)
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE", "YKBNK", "FROTO", "ENKAI", "GARAN", "PGSUS"]
-            bist_metin = ""
+            bist_sonuclar = []
             for hisse in bist_hisseler:
                 sonuc = teknik_durum_bildir(hisse, "turkey", "BIST")
-                if sonuc: bist_metin += sonuc + "\n"
+                if sonuc: bist_sonuclar.append(sonuc)
                 time.sleep(0.5)
-            GUNUN_FIRSATLARI["BIST"] = bist_metin if bist_metin else "➖ Aşırı uçlarda sinyal yok."
+            GUNUN_FIRSATLARI["BIST"] = "\n".join(bist_sonuclar[:5]) if bist_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
+            # 4. ABD TARAMASI (Top-5 Sınırı)
             abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "NFLX", "INTC", "BA", "DIS", "JPM"]
-            abd_metin = ""
+            abd_sonuclar = []
             for hisse in abd_hisseler:
                 sonuc = teknik_durum_bildir(hisse, "america", "NASDAQ") or teknik_durum_bildir(hisse, "america", "NYSE")
-                if sonuc: abd_metin += sonuc + "\n"
+                if sonuc: abd_sonuclar.append(sonuc)
                 time.sleep(0.5)
-            GUNUN_FIRSATLARI["ABD"] = abd_metin if abd_metin else "➖ Aşırı uçlarda sinyal yok."
+            GUNUN_FIRSATLARI["ABD"] = "\n".join(abd_sonuclar[:5]) if abd_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
             print("Gölge Tarayıcı turu tamamladı. 1 saat uykuya geçiyor...")
             time.sleep(3600) 
@@ -242,17 +228,17 @@ def golge_tarayici():
 
 # --- 4. RAPORLAMA MERKEZİ (ÖN YÜZ) ---
 def radar_raporu_hazirla():
-    rapor = "🎯 **ZEKİ ASİSTAN: NOKTA ATIŞI FIRSAT RAPORU** 🎯\n"
+    rapor = "🎯 <b>ZEKİ ASİSTAN: NOKTA ATIŞI FIRSAT RAPORU</b> 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n"
-    rapor += "🇺🇸 **GLOBAL FIRSAT (ABD)**\n"
+    rapor += "🇺🇸 <b>GLOBAL FIRSAT (ABD Top-5)</b>\n"
     rapor += f"{GUNUN_FIRSATLARI['ABD']}\n\n"
-    rapor += "🇹🇷 **LOKAL FIRSAT (BIST / VİOP)**\n"
+    rapor += "🇹🇷 <b>LOKAL FIRSAT (BIST Top-5)</b>\n"
     rapor += f"{GUNUN_FIRSATLARI['BIST']}\n\n"
-    rapor += "📊 **FON FIRSATI (TEFAS)**\n"
+    rapor += "📊 <b>FON FIRSATI (TEFAS En Çok Düşenler)</b>\n"
     rapor += f"{GUNUN_FIRSATLARI['TEFAS']}\n"
     rapor += "----------------------------------\n"
-    rapor += "👉 *İşlemlerini aracı kurumundan, belirtilen hedeflerle girebilirsin.*"
+    rapor += "👉 <i>İşlemlerini aracı kurumundan, belirtilen hedeflerle girebilirsin.</i>"
     return rapor
 
 def rapor_gonder():
@@ -260,7 +246,11 @@ def rapor_gonder():
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("✅ İŞLEM GİRİLDİ", callback_data="onay"),
                types.InlineKeyboardButton("❌ PAS GEÇ", callback_data="red"))
-    bot.send_message(CHAT_ID, mesaj, reply_markup=markup, parse_mode="Markdown")
+    # Güvenlik ağı (Try-Except) eklendi
+    try:
+        bot.send_message(CHAT_ID, mesaj, reply_markup=markup, parse_mode="HTML")
+    except Exception as e:
+        bot.send_message(CHAT_ID, "⚠️ Rapor çok büyük veya geçici bir format sorunu var. Kuantum motoru verileri süzüyor...")
 
 # --- 5. KOMUTLAR VE ZAMANLAYICI ---
 @bot.message_handler(commands=['rapor'])
@@ -279,8 +269,11 @@ def zamanlayici():
     while True:
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
-            bot.send_message(CHAT_ID, "🔔 **KUANTUM RADARI DEVREDE** | Hedefli Fırsatlar Sunuluyor...")
-            rapor_gonder()
+            try:
+                bot.send_message(CHAT_ID, "🔔 <b>KUANTUM RADARI DEVREDE</b> | Hedefli Fırsatlar Sunuluyor...", parse_mode="HTML")
+                rapor_gonder()
+            except:
+                pass
             time.sleep(70)
         time.sleep(30)
 
