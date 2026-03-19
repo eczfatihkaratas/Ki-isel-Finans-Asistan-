@@ -92,11 +92,18 @@ Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fi
 Haber Analizi: (Faz 3'te eklenecek).
 """
 
+"""
+PROJE FELSEFESİ VE HAFIZA BLOĞU:
+Hedef: 2027 Robert Kolej Fonu
+Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS Hayalet Tarayıcısı Eklendi)
+Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
+"""
+
 import telebot
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval
-from tefas import Crawler
 import pandas as pd
+import requests
 import time
 import datetime
 import threading
@@ -114,14 +121,14 @@ GUNUN_FIRSATLARI = {
     "MAKRO": "Veriler toplanıyor...",
     "ABD": "Geniş piyasa taraması devam ediyor...",
     "BIST": "Geniş BIST taraması devam ediyor...",
-    "TEFAS": "Tüm fonlar analiz ediliyor..."
+    "TEFAS": "TEFAS verileri özel API üzerinden çekiliyor..."
 }
 
 @app.route('/')
 def index():
     return "Nokta Atışı Kuantum Motoru 7/24 Devrede!"
 
-# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları Eklendi) ---
+# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları) ---
 def teknik_durum_bildir(symbol, screener, exchange):
     try:
         handler = TA_Handler(
@@ -135,14 +142,13 @@ def teknik_durum_bildir(symbol, screener, exchange):
         rsi = analiz.indicators.get('RSI')
         fiyat = analiz.indicators.get('close')
         
-        # Pivot Noktaları: S1 (Destek/Stop), R1 (Direnç/Hedef)
         direnc = analiz.indicators.get('Pivot.M.Classic.R1', fiyat * 1.05)
         destek = analiz.indicators.get('Pivot.M.Classic.S1', fiyat * 0.95)
 
         if rsi < 30:
             return f"🟢 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 **Aksiyon:** DİPTE! Kademeli Al veya PUT Sat.\n   └ 🎯 **Hedef:** {direnc:.2f} | 🛑 **Stop:** {destek:.2f}"
         elif rsi > 70:
-            return f"🔴 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 **Aksiyon:** ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 **Geri Çekilme Hedefi:** {destek:.2f} | 🛑 **Zarar Kes:** {direnc:.2f}"
+            return f"🔴 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 **Aksiyon:** ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 **Geri Çekilme:** {destek:.2f} | 🛑 **Zarar Kes:** {direnc:.2f}"
         elif tavsiye == "STRONG_SELL":
             return f"🔴 **{symbol}** (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 **Aksiyon:** 📉 GÜÇLÜ DÜŞÜŞ TRENDİ (Dipten dönüşü bekle)\n   └ 🎯 **Düşüş Beklentisi:** {destek:.2f}"
         elif tavsiye == "STRONG_BUY":
@@ -161,29 +167,48 @@ def golge_tarayici():
             vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
             makro_metin = ""
             if vix > 25:
-                makro_metin += f"💎 **VIX KORKU ENDEKSİ:** {vix:.2f} (YÜKSEK!)\n👉 *Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için en kârlı gün.*\n"
+                makro_metin += f"💎 **VIX KORKU ENDEKSİ:** {vix:.2f} (YÜKSEK!)\n👉 *Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için harika.*\n"
             else:
                 makro_metin += f"⚖️ **VIX KORKU ENDEKSİ:** {vix:.2f} (Stabil)\n"
             GUNUN_FIRSATLARI["MAKRO"] = makro_metin
             
-            # 2. TEFAS FONLARI
+            # 2. ÖZEL TEFAS HAYALET TARAYICI (Chrome'a ihtiyaç duymadan doğrudan API'den çeker)
             try:
-                c = Crawler()
+                url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
-                baslangic = (bugun - datetime.timedelta(days=4)).strftime("%Y-%m-%d")
-                bitis = bugun.strftime("%Y-%m-%d")
-                fon_verisi = c.fetch(start=baslangic, end=bitis, columns=["code", "title", "daily_return"])
+                baslangic = (bugun - datetime.timedelta(days=4)).strftime("%d.%m.%Y")
+                bitis = bugun.strftime("%d.%m.%Y")
+
+                payload = f"fontip=YAT&sfontip=&fongrup=&baslangic={baslangic}&bitis={bitis}&fonkod="
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+
+                res = requests.post(url, data=payload, headers=headers, timeout=15)
                 
-                if fon_verisi is not None and not fon_verisi.empty:
-                    fon_verisi['daily_return'] = pd.to_numeric(fon_verisi['daily_return'], errors='coerce')
-                    en_cok_dusenler = fon_verisi.sort_values(by="daily_return", ascending=True).head(3)
-                    
-                    tefas_metin = "🚨 **DİPTEKİ FON FIRSATLARI (TEFAS)**\n"
-                    for index, row in en_cok_dusenler.iterrows():
-                        tefas_metin += f"📉 **{row['code']}**: %{row['daily_return']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
-                    GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
-            except:
-                pass
+                if res.status_code == 200:
+                    veri = res.json().get("data", [])
+                    if veri:
+                        df = pd.DataFrame(veri)
+                        df['GÜNLÜK GETİRİ'] = pd.to_numeric(df['GÜNLÜK GETİRİ'], errors='coerce')
+                        
+                        # Sadece ekside olanları (alım fırsatlarını) filtrele
+                        df_dusenler = df[df['GÜNLÜK GETİRİ'] < 0]
+                        en_cok_dusenler = df_dusenler.sort_values(by="GÜNLÜK GETİRİ", ascending=True).head(3)
+                        
+                        tefas_metin = "🚨 **DİPTEKİ FON FIRSATLARI (TEFAS)**\n"
+                        if not en_cok_dusenler.empty:
+                            for index, row in en_cok_dusenler.iterrows():
+                                tefas_metin += f"📉 **{row.get('FON KODU', 'FON')}**: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
+                            GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
+                        else:
+                            GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
+                else:
+                    GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS sunucuları geçici olarak yanıt vermiyor."
+            except Exception as e:
+                GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS taraması şu an yapılamıyor."
 
             # 3. BİST VE ABD TARAMASI
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE", "YKBNK", "FROTO", "ENKAI", "GARAN", "PGSUS"]
