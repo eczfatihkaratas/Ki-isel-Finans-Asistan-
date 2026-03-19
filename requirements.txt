@@ -5,3 +5,4 @@ tradingview_ta
 tefas
 pandas
 lxml
+webdriver-manager
