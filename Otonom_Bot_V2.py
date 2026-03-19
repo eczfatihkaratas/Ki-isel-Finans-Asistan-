@@ -92,7 +92,16 @@ Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç Fiyatl
 Güvenlik: Raporlar parçalara bölündü ve her adım Render Logs ekranına yazdırıldı.
 """
 
+"""
+PROJE FELSEFESİ VE HAFIZA BLOĞU:
+Hedef: 2027 Robert Kolej Fonu
+Mimari: Nokta Atışı Kuantum Radar (Dedektif Logları + Parçalı Raporlama)
+Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç Fiyatları Verir.
+Güvenlik: Raporlar parçalara bölündü ve her adım Render Logs ekranına yazdırıldı.
+"""
+
 import telebot
+from telebot import types # EKSİK OLAN KRİTİK SATIR EKLENDİ
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval
 import pandas as pd
@@ -244,7 +253,7 @@ def rapor_gonder(hedef_chat_id):
     print("[LOG] Rapor gönderme işlemi başlatıldı...")
     mesaj = radar_raporu_hazirla()
     
-    # Senin fikrin: Mesajı parçalara böl (3000 karakterlik güvenli dilimler)
+    # Mesajı parçalara böl (3000 karakterlik güvenli dilimler)
     parcalar = [mesaj[i:i+3000] for i in range(0, len(mesaj), 3000)]
     print(f"[LOG] Rapor {len(parcalar)} parçaya bölündü. Gönderiliyor...")
     
