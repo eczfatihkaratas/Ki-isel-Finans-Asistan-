@@ -87,17 +87,9 @@ Sistem sana Telegram üzerinden şu formatta bir mesaj atacak:
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Matematiksel Quant Motoru)
-Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
-Haber Analizi: (Faz 3'te eklenecek).
-"""
-
-"""
-PROJE FELSEFESİ VE HAFIZA BLOĞU:
-Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS API + Çelik Yelekli Raporlama)
+Mimari: Nokta Atışı Kuantum Radar (Saf Metin - Kurşun Geçirmez Format)
 Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç Fiyatları Verir.
-Güvenlik: Hata yutucu (Fallback) eklendi. Bot asla sessizce çökmez, gerekirse düz metin atar.
+Güvenlik: Tüm HTML/Markdown formatları kaldırıldı. Telegram'ın sessizce engellemesi imkansız hale getirildi.
 """
 
 import telebot
@@ -129,7 +121,7 @@ GUNUN_FIRSATLARI = {
 def index():
     return "Nokta Atışı Kuantum Motoru 7/24 Devrede!"
 
-# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları) ---
+# --- 2. TEKNİK ANALİZ BEYNİ (Saf Metin) ---
 def teknik_durum_bildir(symbol, screener, exchange):
     try:
         handler = TA_Handler(
@@ -143,20 +135,19 @@ def teknik_durum_bildir(symbol, screener, exchange):
         rsi = analiz.indicators.get('RSI')
         fiyat = analiz.indicators.get('close')
         
-        # Hata koruması: Fiyat veya RSI çekilemezse pas geç
         if fiyat is None or rsi is None: return None
 
         direnc = analiz.indicators.get('Pivot.M.Classic.R1', fiyat * 1.05)
         destek = analiz.indicators.get('Pivot.M.Classic.S1', fiyat * 0.95)
 
         if rsi < 30:
-            return f"🟢 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 <b>Aksiyon:</b> DİPTE! Kademeli Al veya PUT Sat.\n   └ 🎯 <b>Hedef:</b> {direnc:.2f} | 🛑 <b>Stop:</b> {destek:.2f}"
+            return f"🟢 {symbol} (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 Aksiyon: DİPTE! Kademeli Al veya PUT Sat.\n   └ 🎯 Hedef: {direnc:.2f} | 🛑 Stop: {destek:.2f}"
         elif rsi > 70:
-            return f"🔴 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 <b>Aksiyon:</b> ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 <b>Geri Çekilme:</b> {destek:.2f} | 🛑 <b>Zarar Kes:</b> {direnc:.2f}"
+            return f"🔴 {symbol} (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f} (Aşırı Alım)\n   └ 🛠 Aksiyon: ZİRVE! Kar Al, VİOP Şort veya CALL Sat.\n   └ 🎯 Geri Çekilme: {destek:.2f} | 🛑 Zarar Kes: {direnc:.2f}"
         elif tavsiye == "STRONG_SELL":
-            return f"🔴 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 <b>Aksiyon:</b> 📉 GÜÇLÜ DÜŞÜŞ TRENDİ (Dipten dönüşü bekle)\n   └ 🎯 <b>Düşüş Beklentisi:</b> {destek:.2f}"
+            return f"🔴 {symbol} (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 Aksiyon: 📉 GÜÇLÜ DÜŞÜŞ TRENDİ (Dipten dönüşü bekle)\n   └ 🎯 Düşüş Beklentisi: {destek:.2f}"
         elif tavsiye == "STRONG_BUY":
-            return f"🟢 <b>{symbol}</b> (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 <b>Aksiyon:</b> 📈 GÜÇLÜ YÜKSELİŞ TRENDİ (Trende Katıl)\n   └ 🎯 <b>Hedef:</b> {direnc:.2f} | 🛑 <b>Stop:</b> {destek:.2f}"
+            return f"🟢 {symbol} (Güncel: {fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 Aksiyon: 📈 GÜÇLÜ YÜKSELİŞ TRENDİ (Trende Katıl)\n   └ 🎯 Hedef: {direnc:.2f} | 🛑 Stop: {destek:.2f}"
         else:
             return None 
     except:
@@ -171,9 +162,9 @@ def golge_tarayici():
             vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
             makro_metin = ""
             if vix > 25:
-                makro_metin += f"💎 <b>VIX KORKU ENDEKSİ:</b> {vix:.2f} (YÜKSEK!)\n👉 <i>Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için harika.</i>\n"
+                makro_metin += f"💎 VIX KORKU ENDEKSİ: {vix:.2f} (YÜKSEK!)\n👉 Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için harika.\n"
             else:
-                makro_metin += f"⚖️ <b>VIX KORKU ENDEKSİ:</b> {vix:.2f} (Stabil)\n"
+                makro_metin += f"⚖️ VIX KORKU ENDEKSİ: {vix:.2f} (Stabil)\n"
             GUNUN_FIRSATLARI["MAKRO"] = makro_metin
             
             # 2. ÖZEL TEFAS HAYALET TARAYICI
@@ -201,12 +192,11 @@ def golge_tarayici():
                         df_dusenler = df[df['GÜNLÜK GETİRİ'] < 0]
                         en_cok_dusenler = df_dusenler.sort_values(by="GÜNLÜK GETİRİ", ascending=True).head(3)
                         
-                        tefas_metin = "🚨 <b>DİPTEKİ FON FIRSATLARI (TEFAS)</b>\n"
+                        tefas_metin = "🚨 DİPTEKİ FON FIRSATLARI (TEFAS)\n"
                         if not en_cok_dusenler.empty:
                             for index, row in en_cok_dusenler.iterrows():
-                                # İsmin içindeki HTML bozucu < > işaretlerini temizle
-                                fon_ismi = str(row.get('FON KODU', 'FON')).replace('<', '').replace('>', '')
-                                tefas_metin += f"📉 <b>{fon_ismi}</b>: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
+                                fon_ismi = str(row.get('FON KODU', 'FON'))
+                                tefas_metin += f"📉 {fon_ismi}: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
                             GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
@@ -241,44 +231,41 @@ def golge_tarayici():
 
 # --- 4. RAPORLAMA MERKEZİ (ÖN YÜZ) ---
 def radar_raporu_hazirla():
-    rapor = "🎯 <b>ZEKİ ASİSTAN: NOKTA ATIŞI FIRSAT RAPORU</b> 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: NOKTA ATIŞI FIRSAT RAPORU 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n"
-    rapor += "🇺🇸 <b>GLOBAL FIRSAT (ABD Top-5)</b>\n"
+    rapor += "🇺🇸 GLOBAL FIRSAT (ABD Top-5)\n"
     rapor += f"{GUNUN_FIRSATLARI['ABD']}\n\n"
-    rapor += "🇹🇷 <b>LOKAL FIRSAT (BIST Top-5)</b>\n"
+    rapor += "🇹🇷 LOKAL FIRSAT (BIST Top-5)\n"
     rapor += f"{GUNUN_FIRSATLARI['BIST']}\n\n"
-    rapor += "📊 <b>FON FIRSATI (TEFAS En Çok Düşenler)</b>\n"
+    rapor += "📊 FON FIRSATI (TEFAS En Çok Düşenler)\n"
     rapor += f"{GUNUN_FIRSATLARI['TEFAS']}\n"
     rapor += "----------------------------------\n"
-    rapor += "👉 <i>İşlemlerini aracı kurumundan, belirtilen hedeflerle girebilirsin.</i>"
+    rapor += "👉 İşlemlerini aracı kurumundan, belirtilen hedeflerle girebilirsin."
     return rapor
 
-# Dinamik Chat ID özelliği eklendi! Hangi sohbette yazarsan oraya atar.
-def rapor_gonder(hedef_chat_id=None):
-    if hedef_chat_id is None:
-        hedef_chat_id = CHAT_ID
-        
+def rapor_gonder(hedef_chat_id):
     mesaj = radar_raporu_hazirla()
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("✅ İŞLEM GİRİLDİ", callback_data="onay"),
                types.InlineKeyboardButton("❌ PAS GEÇ", callback_data="red"))
     
-    # Güvenlik ağı: Uzunluk ve HTML çökmesine karşı Çelik Yelek
-    try:
-        if len(mesaj) > 4000:
-            mesaj = mesaj[:4000] + "\n\n⚠️ [Mesaj çok uzun olduğu için kesildi]"
-        bot.send_message(hedef_chat_id, mesaj, reply_markup=markup, parse_mode="HTML")
-    except Exception as e:
-        # EĞER HTML HATA VERİRSE: Düz metin olarak sana hatanın sebebini yazacak!
-        hata_logu = f"⚠️ FORMAT HATASI: Telegram süslü yazıları reddetti (Sebep: {e}).\n\n--- DÜZ METİN RAPOR --- \n\n{mesaj}"
-        bot.send_message(hedef_chat_id, hata_logu[:4000])
+    # Güvenlik Ağı: Karakter sınırı aşılırsa kes
+    if len(mesaj) > 4000:
+        mesaj = mesaj[:4000] + "\n\n⚠️ [Mesaj çok uzun olduğu için kesildi]"
+        
+    # Saf metin olarak gönderilir, parse_mode yoktur. Telegram engellemesi İMKANSIZDIR.
+    bot.send_message(hedef_chat_id, mesaj, reply_markup=markup)
 
 # --- 5. KOMUTLAR VE ZAMANLAYICI ---
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
-    bot.reply_to(message, "⏳ Hafıza Kutusundaki en taze tarama sonuçları ve hedefler getiriliyor...")
-    rapor_gonder(message.chat.id) # Gelen komutun kimliğine (sana) direkt cevap verir
+    try:
+        bot.reply_to(message, "⏳ Hafıza Kutusundaki en taze tarama sonuçları ve hedefler getiriliyor...")
+        rapor_gonder(message.chat.id)
+    except Exception as e:
+        # Kodun herhangi bir yerinde hata çıkarsa sana direk mesaj atacak!
+        bot.reply_to(message, f"⚠️ KOD HATASI: {str(e)}")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -292,7 +279,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 <b>KUANTUM RADARI DEVREDE</b> | Hedefli Fırsatlar Sunuluyor...", parse_mode="HTML")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI DEVREDE | Hedefli Fırsatlar Sunuluyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
