@@ -87,9 +87,9 @@ Sistem sana Telegram üzerinden şu formatta bir mesaj atacak:
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Saf Metin - Kurşun Geçirmez Format)
+Mimari: Nokta Atışı Kuantum Radar (Dedektif Logları + Parçalı Raporlama)
 Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç Fiyatları Verir.
-Güvenlik: Tüm HTML/Markdown formatları kaldırıldı. Telegram'ın sessizce engellemesi imkansız hale getirildi.
+Güvenlik: Raporlar parçalara bölündü ve her adım Render Logs ekranına yazdırıldı.
 """
 
 import telebot
@@ -155,10 +155,10 @@ def teknik_durum_bildir(symbol, screener, exchange):
 
 # --- 3. GÖLGE TARAYICI (ARKA PLAN İŞÇİSİ) ---
 def golge_tarayici():
-    print("Gölge Tarayıcı uyandı, piyasaları tarıyor...")
+    print("[LOG] Gölge Tarayıcı uyandı, piyasaları tarıyor...")
     while True:
         try:
-            # 1. MAKRO VERİLER
+            # MAKRO
             vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
             makro_metin = ""
             if vix > 25:
@@ -167,28 +167,24 @@ def golge_tarayici():
                 makro_metin += f"⚖️ VIX KORKU ENDEKSİ: {vix:.2f} (Stabil)\n"
             GUNUN_FIRSATLARI["MAKRO"] = makro_metin
             
-            # 2. ÖZEL TEFAS HAYALET TARAYICI
+            # TEFAS
             try:
                 url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
                 baslangic = (bugun - datetime.timedelta(days=4)).strftime("%d.%m.%Y")
                 bitis = bugun.strftime("%d.%m.%Y")
-
                 payload = f"fontip=YAT&sfontip=&fongrup=&baslangic={baslangic}&bitis={bitis}&fonkod="
                 headers = {
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "X-Requested-With": "XMLHttpRequest",
                     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
                 }
-
                 res = requests.post(url, data=payload, headers=headers, timeout=15)
-                
                 if res.status_code == 200:
                     veri = res.json().get("data", [])
                     if veri:
                         df = pd.DataFrame(veri)
                         df['GÜNLÜK GETİRİ'] = pd.to_numeric(df['GÜNLÜK GETİRİ'], errors='coerce')
-                        
                         df_dusenler = df[df['GÜNLÜK GETİRİ'] < 0]
                         en_cok_dusenler = df_dusenler.sort_values(by="GÜNLÜK GETİRİ", ascending=True).head(3)
                         
@@ -205,7 +201,7 @@ def golge_tarayici():
             except:
                 GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS taraması şu an yapılamıyor."
 
-            # 3. BİST TARAMASI (Top-5)
+            # BIST
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE", "YKBNK", "FROTO", "ENKAI", "GARAN", "PGSUS"]
             bist_sonuclar = []
             for hisse in bist_hisseler:
@@ -214,7 +210,7 @@ def golge_tarayici():
                 time.sleep(0.5)
             GUNUN_FIRSATLARI["BIST"] = "\n".join(bist_sonuclar[:5]) if bist_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
-            # 4. ABD TARAMASI (Top-5)
+            # ABD
             abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "NFLX", "INTC", "BA", "DIS", "JPM"]
             abd_sonuclar = []
             for hisse in abd_hisseler:
@@ -223,10 +219,10 @@ def golge_tarayici():
                 time.sleep(0.5)
             GUNUN_FIRSATLARI["ABD"] = "\n".join(abd_sonuclar[:5]) if abd_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
-            print("Gölge Tarayıcı turu tamamladı...")
+            print("[LOG] Gölge Tarayıcı turu tamamladı. Beklemeye geçiyor.")
             time.sleep(3600) 
-
         except Exception as e:
+            print(f"[LOG HATA] Gölge tarayıcıda sorun: {e}")
             time.sleep(60)
 
 # --- 4. RAPORLAMA MERKEZİ (ÖN YÜZ) ---
@@ -245,27 +241,39 @@ def radar_raporu_hazirla():
     return rapor
 
 def rapor_gonder(hedef_chat_id):
+    print("[LOG] Rapor gönderme işlemi başlatıldı...")
     mesaj = radar_raporu_hazirla()
+    
+    # Senin fikrin: Mesajı parçalara böl (3000 karakterlik güvenli dilimler)
+    parcalar = [mesaj[i:i+3000] for i in range(0, len(mesaj), 3000)]
+    print(f"[LOG] Rapor {len(parcalar)} parçaya bölündü. Gönderiliyor...")
+    
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("✅ İŞLEM GİRİLDİ", callback_data="onay"),
                types.InlineKeyboardButton("❌ PAS GEÇ", callback_data="red"))
     
-    # Güvenlik Ağı: Karakter sınırı aşılırsa kes
-    if len(mesaj) > 4000:
-        mesaj = mesaj[:4000] + "\n\n⚠️ [Mesaj çok uzun olduğu için kesildi]"
-        
-    # Saf metin olarak gönderilir, parse_mode yoktur. Telegram engellemesi İMKANSIZDIR.
-    bot.send_message(hedef_chat_id, mesaj, reply_markup=markup)
+    try:
+        for index, parca in enumerate(parcalar):
+            # Sadece en son parçanın altına onay butonunu koy
+            if index == len(parcalar) - 1:
+                bot.send_message(hedef_chat_id, parca, reply_markup=markup)
+            else:
+                bot.send_message(hedef_chat_id, parca)
+        print("[LOG] Rapor başarıyla Telegram'a ulaştı!")
+    except Exception as e:
+        print(f"[LOG HATA] Telegram'a gönderim BAŞARISIZ! Sebep: {e}")
+        bot.send_message(hedef_chat_id, f"⚠️ KOD HATASI: Telegram mesajı reddetti. Sebep: {e}")
 
 # --- 5. KOMUTLAR VE ZAMANLAYICI ---
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
+        print("[LOG] Kullanıcıdan /rapor komutu geldi.")
         bot.reply_to(message, "⏳ Hafıza Kutusundaki en taze tarama sonuçları ve hedefler getiriliyor...")
         rapor_gonder(message.chat.id)
     except Exception as e:
-        # Kodun herhangi bir yerinde hata çıkarsa sana direk mesaj atacak!
-        bot.reply_to(message, f"⚠️ KOD HATASI: {str(e)}")
+        print(f"[LOG HATA] Komut işleme hatası: {e}")
+        bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
