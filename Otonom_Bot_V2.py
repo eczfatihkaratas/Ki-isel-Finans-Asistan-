@@ -99,6 +99,13 @@ Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS Hayalet Tarayıcısı Eklendi)
 Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
 """
 
+"""
+PROJE FELSEFESİ VE HAFIZA BLOĞU:
+Hedef: 2027 Robert Kolej Fonu
+Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS Hayalet Tarayıcısı Eklendi)
+Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
+"""
+
 import telebot
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval
