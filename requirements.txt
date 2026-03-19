@@ -2,3 +2,6 @@ pyTelegramBotAPI
 yfinance
 flask
 tradingview_ta
+tefas
+pandas
+lxml
