@@ -264,6 +264,14 @@ Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fi
 Haber Analizi: (Faz 3'te eklenecek).
 """
 
+"""
+PROJE FELSEFESİ VE HAFIZA BLOĞU:
+Hedef: 2027 Robert Kolej Fonu
+Mimari: Nokta Atışı Kuantum Radar (Matematiksel Quant Motoru)
+Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
+Haber Analizi: (Faz 3'te eklenecek).
+"""
+
 import telebot
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval
@@ -278,6 +286,7 @@ from flask import Flask
 # --- 1. AYARLAR VE HAFIZA KUTUSU ---
 TOKEN = "8492116791:AAErfalTR_QVHzT5Rifnwp-1fcC5ZKdvI3A"
 CHAT_ID = "967303324"
+
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
