@@ -87,9 +87,17 @@ Sistem sana Telegram üzerinden şu formatta bir mesaj atacak:
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: 2027 Robert Kolej Fonu
-Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS API + HTML Zırhlı Raporlama)
-Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
-Güvenlik: Top-5 Filtresi ile Telegram karakter sınırını aşması ve sessizce çökmesi engellendi.
+Mimari: Nokta Atışı Kuantum Radar (Matematiksel Quant Motoru)
+Yetki: VİOP, Opsiyon, Hisse ve Fonlarda Sinyal + Destek/Direnç (Hedef/Stop) Fiyatları Verir.
+Haber Analizi: (Faz 3'te eklenecek).
+"""
+
+"""
+PROJE FELSEFESİ VE HAFIZA BLOĞU:
+Hedef: 2027 Robert Kolej Fonu
+Mimari: Nokta Atışı Kuantum Radar (Özel TEFAS API + Çelik Yelekli Raporlama)
+Yetki: VİOP, Opsiyon, Hisse ve TEFAS Fonlarında Sinyal + Destek/Direnç Fiyatları Verir.
+Güvenlik: Hata yutucu (Fallback) eklendi. Bot asla sessizce çökmez, gerekirse düz metin atar.
 """
 
 import telebot
@@ -121,7 +129,7 @@ GUNUN_FIRSATLARI = {
 def index():
     return "Nokta Atışı Kuantum Motoru 7/24 Devrede!"
 
-# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları - HTML Formatı) ---
+# --- 2. TEKNİK ANALİZ BEYNİ (Hedef ve Stop Fiyatları) ---
 def teknik_durum_bildir(symbol, screener, exchange):
     try:
         handler = TA_Handler(
@@ -135,6 +143,9 @@ def teknik_durum_bildir(symbol, screener, exchange):
         rsi = analiz.indicators.get('RSI')
         fiyat = analiz.indicators.get('close')
         
+        # Hata koruması: Fiyat veya RSI çekilemezse pas geç
+        if fiyat is None or rsi is None: return None
+
         direnc = analiz.indicators.get('Pivot.M.Classic.R1', fiyat * 1.05)
         destek = analiz.indicators.get('Pivot.M.Classic.S1', fiyat * 0.95)
 
@@ -176,7 +187,7 @@ def golge_tarayici():
                 headers = {
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "X-Requested-With": "XMLHttpRequest",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"
                 }
 
                 res = requests.post(url, data=payload, headers=headers, timeout=15)
@@ -193,16 +204,18 @@ def golge_tarayici():
                         tefas_metin = "🚨 <b>DİPTEKİ FON FIRSATLARI (TEFAS)</b>\n"
                         if not en_cok_dusenler.empty:
                             for index, row in en_cok_dusenler.iterrows():
-                                tefas_metin += f"📉 <b>{row.get('FON KODU', 'FON')}</b>: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
+                                # İsmin içindeki HTML bozucu < > işaretlerini temizle
+                                fon_ismi = str(row.get('FON KODU', 'FON')).replace('<', '').replace('>', '')
+                                tefas_metin += f"📉 <b>{fon_ismi}</b>: %{row['GÜNLÜK GETİRİ']:.2f}\n   └ 🛠 Kademeli toplama fırsatı.\n"
                             GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
                 else:
                     GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS sunucuları geçici olarak yanıt vermiyor."
-            except Exception as e:
+            except:
                 GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS taraması şu an yapılamıyor."
 
-            # 3. BİST TARAMASI (Top-5 Sınırı)
+            # 3. BİST TARAMASI (Top-5)
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE", "YKBNK", "FROTO", "ENKAI", "GARAN", "PGSUS"]
             bist_sonuclar = []
             for hisse in bist_hisseler:
@@ -211,7 +224,7 @@ def golge_tarayici():
                 time.sleep(0.5)
             GUNUN_FIRSATLARI["BIST"] = "\n".join(bist_sonuclar[:5]) if bist_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
-            # 4. ABD TARAMASI (Top-5 Sınırı)
+            # 4. ABD TARAMASI (Top-5)
             abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "NFLX", "INTC", "BA", "DIS", "JPM"]
             abd_sonuclar = []
             for hisse in abd_hisseler:
@@ -220,7 +233,7 @@ def golge_tarayici():
                 time.sleep(0.5)
             GUNUN_FIRSATLARI["ABD"] = "\n".join(abd_sonuclar[:5]) if abd_sonuclar else "➖ Aşırı uçlarda sinyal yok."
 
-            print("Gölge Tarayıcı turu tamamladı. 1 saat uykuya geçiyor...")
+            print("Gölge Tarayıcı turu tamamladı...")
             time.sleep(3600) 
 
         except Exception as e:
@@ -241,22 +254,31 @@ def radar_raporu_hazirla():
     rapor += "👉 <i>İşlemlerini aracı kurumundan, belirtilen hedeflerle girebilirsin.</i>"
     return rapor
 
-def rapor_gonder():
+# Dinamik Chat ID özelliği eklendi! Hangi sohbette yazarsan oraya atar.
+def rapor_gonder(hedef_chat_id=None):
+    if hedef_chat_id is None:
+        hedef_chat_id = CHAT_ID
+        
     mesaj = radar_raporu_hazirla()
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton("✅ İŞLEM GİRİLDİ", callback_data="onay"),
                types.InlineKeyboardButton("❌ PAS GEÇ", callback_data="red"))
-    # Güvenlik ağı (Try-Except) eklendi
+    
+    # Güvenlik ağı: Uzunluk ve HTML çökmesine karşı Çelik Yelek
     try:
-        bot.send_message(CHAT_ID, mesaj, reply_markup=markup, parse_mode="HTML")
+        if len(mesaj) > 4000:
+            mesaj = mesaj[:4000] + "\n\n⚠️ [Mesaj çok uzun olduğu için kesildi]"
+        bot.send_message(hedef_chat_id, mesaj, reply_markup=markup, parse_mode="HTML")
     except Exception as e:
-        bot.send_message(CHAT_ID, "⚠️ Rapor çok büyük veya geçici bir format sorunu var. Kuantum motoru verileri süzüyor...")
+        # EĞER HTML HATA VERİRSE: Düz metin olarak sana hatanın sebebini yazacak!
+        hata_logu = f"⚠️ FORMAT HATASI: Telegram süslü yazıları reddetti (Sebep: {e}).\n\n--- DÜZ METİN RAPOR --- \n\n{mesaj}"
+        bot.send_message(hedef_chat_id, hata_logu[:4000])
 
 # --- 5. KOMUTLAR VE ZAMANLAYICI ---
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     bot.reply_to(message, "⏳ Hafıza Kutusundaki en taze tarama sonuçları ve hedefler getiriliyor...")
-    rapor_gonder()
+    rapor_gonder(message.chat.id) # Gelen komutun kimliğine (sana) direkt cevap verir
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
@@ -271,7 +293,7 @@ def zamanlayici():
         if simdi == "16:30" or simdi == "17:45":
             try:
                 bot.send_message(CHAT_ID, "🔔 <b>KUANTUM RADARI DEVREDE</b> | Hedefli Fırsatlar Sunuluyor...", parse_mode="HTML")
-                rapor_gonder()
+                rapor_gonder(CHAT_ID)
             except:
                 pass
             time.sleep(70)
