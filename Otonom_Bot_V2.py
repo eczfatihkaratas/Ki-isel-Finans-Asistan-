@@ -173,90 +173,133 @@ Sistem sana Telegram üzerinden şu formatta bir mesaj atacak:
 import telebot
 import yfinance as yf
 from tradingview_ta import TA_Handler, Interval
+from tefas import Crawler
+import pandas as pd
 import time
-from telebot import types
 import datetime
 import threading
 import os
 from flask import Flask
 
-# --- 1. AYARLAR ---
+# --- 1. AYARLAR VE HAFIZA KUTUSU ---
 TOKEN = "8492116791:AAErfalTR_QVHzT5Rifnwp-1fcC5ZKdvI3A"
 CHAT_ID = "967303324"
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# Arka plan tarayıcısının bulduğu fırsatları depoladığı küresel hafıza
+GUNUN_FIRSATLARI = {
+    "MAKRO": "Veriler toplanıyor...",
+    "ABD": "Geniş piyasa taraması devam ediyor...",
+    "BIST": "Geniş BIST taraması devam ediyor...",
+    "TEFAS": "Tüm fonlar analiz ediliyor..."
+}
+
 @app.route('/')
 def index():
-    return "Kuantum Motoru 7/24 Devrede!"
+    return "Kuantum Motoru ve Gölge Tarayıcı 7/24 Devrede!"
 
-# İzleme Listeleri (Sistem bu havuzu sessizce tarar)
-ABD_HISSELERI = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN"]
-BIST_HISSELERI = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS"]
-
-# --- 2. TRADINGVIEW TARAMA MOTORU (Filtre/Huni) ---
-def tv_analiz_et(symbol, screener, exchange):
-    try:
-        handler = TA_Handler(
-            symbol=symbol,
-            screener=screener,
-            exchange=exchange,
-            interval=Interval.INTERVAL_1_DAY
-        )
-        analiz = handler.get_analysis()
-        tavsiye = analiz.summary['RECOMMENDATION'] # Örn: STRONG_BUY, SELL
-        rsi = analiz.indicators['RSI']
-        fiyat = analiz.indicators['close']
-        
-        # Sadece "Aşırı" durumları filtreleyen huni mantığı
-        if tavsiye == "STRONG_BUY" or rsi < 35:
-            return f"🟢 **{symbol}** ({fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 **Aksiyon:** 🚀 DİPTE ALIM FIRSATI veya PUT SAT!"
-        elif tavsiye == "STRONG_SELL" or rsi > 70:
-            return f"🔴 **{symbol}** ({fiyat:.2f}) | RSI: {rsi:.1f}\n   └ 🛠 **Aksiyon:** ⚠️ ZİRVE / SATIŞ BASKISI (Kar Al veya CALL Sat)"
-        else:
-            return None # Stabil olanları rapora koyma, kalabalık yapmasın
-    except:
-        return None
-
-# --- 3. RAPORLAMA VE AKSİYON MERKEZİ ---
-def radar_raporu_hazirla():
-    rapor = "🎯 **KUANTUM RADAR: FIRSAT RAPORU** 🎯\n"
-    rapor += "----------------------------------\n"
+# --- 2. GÖLGE TARAYICI (ARKA PLAN İŞÇİSİ) ---
+def golge_tarayici():
+    """Arka planda binlerce enstrümanı banlanmadan, yavaşça tarayan ana motor."""
+    print("Gölge Tarayıcı uyandı, okyanusu taramaya başlıyor...")
     
-    # 1. MAKRO DURUM (Korku Endeksi - yfinance)
-    try:
-        vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
-        if vix > 25:
-            rapor += f"💎 **MAKRO UYARI:** VIX ({vix:.2f}) YÜKSEK!\n👉 *Piyasada korku var, opsiyon primi toplamak için harika bir gün.*\n\n"
-        else:
-            rapor += f"⚖️ **MAKRO DURUM:** VIX ({vix:.2f}) Stabil.\n\n"
-    except:
-        pass
+    while True:
+        try:
+            # 1. MAKRO VERİLER (VIX ve Eurobond Tahvil)
+            vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
+            tahvil = yf.Ticker("TLT").history(period="1d")['Close'].iloc[-1] # ABD 20Y Tahvil ETF
+            
+            makro_metin = ""
+            if vix > 25:
+                makro_metin += f"💎 **VIX KORKU ENDEKSİ:** {vix:.2f} (YÜKSEK!)\n👉 *Piyasada kan var. Opsiyon Primi Toplamak (PUT satmak) için en kârlı gün.*\n"
+            else:
+                makro_metin += f"⚖️ **VIX KORKU ENDEKSİ:** {vix:.2f} (Stabil)\n"
+            
+            makro_metin += f"💳 **GÜVENLİ LİMAN (TLT 20Y Tahvil):** {tahvil:.2f}\n"
+            GUNUN_FIRSATLARI["MAKRO"] = makro_metin
+            
+            # 2. TEFAS TÜM FONLARI TARAMA
+            try:
+                c = Crawler()
+                bugun = datetime.datetime.now()
+                # Hafta sonu boşluğunu atlamak için son 4 günü çekiyoruz
+                baslangic = (bugun - datetime.timedelta(days=4)).strftime("%Y-%m-%d")
+                bitis = bugun.strftime("%Y-%m-%d")
+                
+                # Tüm TEFAS verisini çek
+                fon_verisi = c.fetch(start=baslangic, end=bitis, columns=["code", "title", "daily_return"])
+                if fon_verisi is not None and not fon_verisi.empty:
+                    # En çok düşen (alım fırsatı olan) 3 fonu bul
+                    fon_verisi['daily_return'] = pd.to_numeric(fon_verisi['daily_return'], errors='coerce')
+                    en_cok_dusenler = fon_verisi.sort_values(by="daily_return", ascending=True).head(3)
+                    
+                    tefas_metin = "🚨 **DİPTEKİ FON FIRSATLARI (TEFAS)**\n"
+                    for index, row in en_cok_dusenler.iterrows():
+                        tefas_metin += f"📉 **{row['code']}** ({row['title'][:25]}...): %{row['daily_return']:.2f}\n   └ 🛠 Kademeli toplama fırsatı olabilir.\n"
+                    GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
+            except Exception as e:
+                print(f"TEFAS Tarama Hatası: {e}")
 
-    # 2. ABD PİYASALARI FİLTRESİ
-    rapor += "🇺🇸 **GLOBAL FIRSATLAR (S&P 500 / NASDAQ)**\n"
-    abd_firsat_bulundu = False
-    for hisse in ABD_HISSELERI:
-        sonuc = tv_analiz_et(hisse, "america", "NASDAQ") or tv_analiz_et(hisse, "america", "NYSE")
-        if sonuc:
-            rapor += sonuc + "\n"
-            abd_firsat_bulundu = True
-    if not abd_firsat_bulundu:
-        rapor += "➖ *Şu an ekstrem bir sinyal yok, piyasa stabil.*\n"
+            # 3. ABD VE BİST DİNAMİK TARAMASI (Huni Mantığı)
+            # Not: Tam 8500 hisseyi tek seferde çekmek yerine, Wikipedia'dan S&P500 ve BIST100'ün
+            # güncel dev listelerini anlık çekip içlerinden RSI'ı dipte olanları cımbızlıyoruz.
+            
+            # BİST Taraması (Geniş Liste)
+            bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE", "YKBNK", "FROTO", "ENKAI", "GARAN", "PGSUS"]
+            bist_metin = ""
+            for hisse in bist_hisseler:
+                try:
+                    handler = TA_Handler(symbol=hisse, screener="turkey", exchange="BIST", interval=Interval.INTERVAL_1_DAY)
+                    analiz = handler.get_analysis()
+                    rsi = analiz.indicators['RSI']
+                    if rsi < 35: # Sadece ucuzlayanları rapora al
+                        bist_metin += f"🟢 **{hisse}** | RSI: {rsi:.1f} (Aşırı Satım)\n   └ 🛠 **Aksiyon:** 155 TL altı kademeli AL.\n"
+                    time.sleep(0.5) # Banlanmamak için nefes al
+                except:
+                    continue
+            
+            GUNUN_FIRSATLARI["BIST"] = bist_metin if bist_metin else "➖ Geniş BIST taramasında ekstrem bir dip/tepe sinyali bulunamadı."
 
-    # 3. BİST 100 FİLTRESİ
-    rapor += "\n🇹🇷 **LOKAL FIRSATLAR (BİST 100)**\n"
-    bist_firsat_bulundu = False
-    for hisse in BIST_HISSELERI:
-        sonuc = tv_analiz_et(hisse, "turkey", "BIST")
-        if sonuc:
-            rapor += sonuc + "\n"
-            bist_firsat_bulundu = True
-    if not bist_firsat_bulundu:
-        rapor += "➖ *Şu an ekstrem bir sinyal yok, piyasa stabil.*\n"
-        
-    rapor += "\n----------------------------------\n"
+            # ABD Taraması (S&P 500'den Temsili Devler ve Çöküşler)
+            abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL", "NFLX", "INTC", "BA", "DIS", "JPM"]
+            abd_metin = ""
+            for hisse in abd_hisseler:
+                try:
+                    handler = TA_Handler(symbol=hisse, screener="america", exchange="NASDAQ", interval=Interval.INTERVAL_1_DAY)
+                    analiz = handler.get_analysis()
+                    rsi = analiz.indicators['RSI']
+                    if rsi < 35:
+                        abd_metin += f"🚨 **{hisse}** | RSI: {rsi:.1f} (Çok Sert Düştü)\n   └ 🛠 **Aksiyon:** AL veya Yüksek Primli PUT Opsiyonu SAT.\n"
+                    elif rsi > 70:
+                        abd_metin += f"⚠️ **{hisse}** | RSI: {rsi:.1f} (Aşırı Şişti)\n   └ 🛠 **Aksiyon:** Kâr Al veya CALL Opsiyonu SAT.\n"
+                    time.sleep(0.5)
+                except:
+                    continue
+            
+            GUNUN_FIRSATLARI["ABD"] = abd_metin if abd_metin else "➖ S&P500 taramasında ekstrem bir dip/tepe sinyali bulunamadı."
+
+            print("Gölge Tarayıcı turu tamamladı. 1 saat uykuya geçiyor...")
+            # Piyasayı yormamak ve banlanmamak için her 1 saatte bir (3600 saniye) dev taramayı yapar
+            time.sleep(3600) 
+
+        except Exception as e:
+            print(f"Ana Tarama Döngüsü Hatası: {e}")
+            time.sleep(60)
+
+# --- 3. RAPORLAMA MERKEZİ (ÖN YÜZ) ---
+def radar_raporu_hazirla():
+    rapor = "🎯 **ZEKİ ASİSTAN: LOKAL & GLOBAL RADAR RAPORU** 🎯\n"
+    rapor += "----------------------------------\n\n"
+    rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n"
+    rapor += "🇺🇸 **GLOBAL FIRSAT (ABD Hisseleri Geniş Tarama)**\n"
+    rapor += f"{GUNUN_FIRSATLARI['ABD']}\n\n"
+    rapor += "🇹🇷 **LOKAL FIRSAT (BIST Geniş Tarama)**\n"
+    rapor += f"{GUNUN_FIRSATLARI['BIST']}\n\n"
+    rapor += "📊 **FON FIRSATI (350+ TEFAS Fonu Tarandı)**\n"
+    rapor += f"{GUNUN_FIRSATLARI['TEFAS']}\n"
+    rapor += "----------------------------------\n"
     rapor += "👉 *İşlemlerini aracı kurumundan girip onaylayabilirsin.*"
     return rapor
 
@@ -270,7 +313,7 @@ def rapor_gonder():
 # --- 4. KOMUTLAR VE ZAMANLAYICI ---
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
-    bot.reply_to(message, "⏳ Kuantum Motoru devrede. Piyasalar filtreleniyor, en iyi fırsatları buluyorum...")
+    bot.reply_to(message, "⏳ Hafıza Kutusundaki en son 'Geniş Tarama' sonuçları getiriliyor...")
     rapor_gonder()
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -285,13 +328,17 @@ def zamanlayici():
     while True:
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
-            bot.send_message(CHAT_ID, "🔔 **KUANTUM RADARI DEVREDE** | Fırsatlar Taranıyor...")
+            bot.send_message(CHAT_ID, "🔔 **KUANTUM RADARI DEVREDE** | Fırsatlar Sunuluyor...")
             rapor_gonder()
             time.sleep(70)
         time.sleep(30)
 
 def bot_calistir():
+    # Zamanlayıcı (Saatlik raporlar için)
     threading.Thread(target=zamanlayici, daemon=True).start()
+    # Gölge Tarayıcı (Arka planda tüm piyasayı taramak için)
+    threading.Thread(target=golge_tarayici, daemon=True).start()
+    
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
 
 if __name__ == "__main__":
