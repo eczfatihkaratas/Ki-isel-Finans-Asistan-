@@ -1,8 +1,8 @@
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: Eylül'ün 2027 Robert Kolej Fonu
-Mimari: Kuantum Radar V4 (TEFAS Ajan Modu + Zırhlı Hız + ID Korumalı Excel)
-Yetki: TEFAS inatla sistemde tutuldu, donmalara karşı 5 saniye kuralı getirildi.
+Mimari: Kuantum Radar V5 (Cloudscraper Delici + ID Korumalı Excel)
+Yetki: TEFAS güvenlik duvarını delmeye çalışır, donmaları önler ve hayalet Excel dosyası yaratmaz.
 """
 
 import telebot
@@ -13,6 +13,7 @@ import pandas as pd
 import requests
 import feedparser
 import gspread 
+import cloudscraper # SİBER DUVAR DELİCİ EKLENDİ
 import time
 import datetime
 import threading
@@ -26,6 +27,9 @@ CHAT_ID = "967303324"
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
+# Tüm internet bağlantılarını standart requests yerine Cloudflare Delici ile yapacağız
+scraper = cloudscraper.create_scraper()
+
 GUNUN_FIRSATLARI = {
     "MAKRO": "Veriler toplanıyor...",
     "ABD": "Geniş piyasa taraması devam ediyor...",
@@ -38,9 +42,9 @@ POZITIF_KELIMELER = ["rekor", "kar", "büyüme", "anlaşma", "faiz indirim", "y�
 
 @app.route('/')
 def index():
-    return "Muhasebe Modüllü Kuantum Motoru V4 Devrede!"
+    return "Kuantum Motoru V5 (Ağır Silahlı) Devrede!"
 
-# --- 2. DUYGU ANALİZİ (HABER OKUMA - ZAMAN KORUMALI) ---
+# --- 2. DUYGU ANALİZİ (HABER OKUMA - Zaman Korumalı) ---
 def haber_duygusu_olc(ticker, is_us=True):
     try:
         if is_us:
@@ -48,7 +52,8 @@ def haber_duygusu_olc(ticker, is_us=True):
         else:
             rss_url = "https://www.ekonomim.com/rss"
         
-        res = requests.get(rss_url, timeout=5) # 5 Saniye Kuralı
+        # 5 Saniye kilitlenme koruması ve scraper kullanıldı
+        res = scraper.get(rss_url, timeout=5)
         feed = feedparser.parse(res.content)
         puan = 0
         
@@ -113,7 +118,7 @@ def golge_tarayici():
             makro = f"💎 VIX KORKU ENDEKSİ: {vix:.2f} " + ("(YÜKSEK! KAN VAR 🚨)" if vix > 25 else "(Stabil ⚖️)")
             GUNUN_FIRSATLARI["MAKRO"] = makro
             
-            # 2. TEFAS AJAN MODU (Asla Vazgeçmiyoruz)
+            # 2. TEFAS (Cloudscraper Delici Kullanılıyor)
             try:
                 url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
@@ -121,17 +126,14 @@ def golge_tarayici():
                 bitis = bugun.strftime("%d.%m.%Y")
                 payload = f"fontip=YAT&sfontip=&fongrup=&baslangic={baslangic}&bitis={bitis}&fonkod="
                 
-                # Bota "Ben bir Google Chrome tarayıcısıyım" sahte kimliği veriliyor
                 headers = {
                     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
                     "X-Requested-With": "XMLHttpRequest",
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                    "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx",
-                    "Origin": "https://www.tefas.gov.tr"
+                    "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx"
                 }
                 
-                # DİKKAT: 5 saniye bekle, açmazlarsa donma, sistemi kitlemeden kaç (timeout=5)
-                res = requests.post(url, data=payload, headers=headers, timeout=5)
+                # scraper.post kullanarak siber duvarı delmeyi deniyoruz. 10 saniye sabır süresi.
+                res = scraper.post(url, data=payload, headers=headers, timeout=10)
                 
                 if res.status_code == 200:
                     veri = res.json().get("data", [])
@@ -150,9 +152,9 @@ def golge_tarayici():
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
                 else:
-                    GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS güvenlik duvarı API isteğini reddetti."
+                    GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS güvenlik duvarı isteği reddetti (Kod: {res.status_code})."
             except Exception as e:
-                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS bağlantısı 5 saniyeyi aştığı için pas geçildi."
+                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS bağlantısı 10 saniyeyi aştığı için (donmamak adına) pas geçildi."
 
             # 3. BIST (Teknik + Duygu)
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE"]
@@ -170,7 +172,7 @@ def golge_tarayici():
 
 # --- 5. RAPORLAMA VE MUHASEBE MERKEZİ ---
 def radar_raporu_hazirla():
-    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V4 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V5 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n\n"
     rapor += "🇺🇸 GLOBAL FIRSAT (Teknik + Haber)\n"
@@ -200,7 +202,7 @@ def rapor_gonder(hedef_chat_id):
     except Exception as e:
         bot.send_message(hedef_chat_id, f"⚠️ KOD HATASI: {e}")
 
-# YENİ EKLENDİ: ID Korumalı Kusursuz Excel Bağlantısı
+# YENİ EKLENDİ: Hayalet Dosya İhtimalini Bitiren ID Bağlantısı
 def excel_kayit_yap(message):
     try:
         gc = gspread.service_account(filename='creds.json')
@@ -222,7 +224,7 @@ def excel_kayit_yap(message):
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
-        bot.reply_to(message, "⏳ Piyasalar taranıyor...")
+        bot.reply_to(message, "⏳ Piyasalar taranıyor... TEFAS zırhı test ediliyor...")
         rapor_gonder(message.chat.id)
     except Exception as e:
         bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
@@ -240,7 +242,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V4 DEVREDE | Piyasalar Koklanıyor...")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V5 DEVREDE | Piyasalar Koklanıyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
