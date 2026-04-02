@@ -203,7 +203,7 @@ def excel_kayit_yap(message):
     try:
         gc = gspread.service_account(filename='creds.json')
         
-        # --- DİKKAT: AŞAĞIDAKİ YERE KENDİ EXCEL ID NUMARANI YAPIŞTIR ---
+        # PATRONUN EXCEL KİMLİĞİ BURAYA MÜHÜRLENDİ!
         sh = gc.open_by_key("14Q8repG8ThqSeSsPyy6uaLrFDdtwsCsdfwj2cu3H3VA")
         
         worksheet = sh.sheet1 
