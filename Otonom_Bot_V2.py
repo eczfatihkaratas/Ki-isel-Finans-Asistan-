@@ -1,8 +1,8 @@
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: Eylül'ün 2027 Robert Kolej Fonu
-Mimari: Kuantum Radar V7 (İş Yatırım İstihbaratı + Akıllı Excel Muhasebe)
-Yetki: TEFAS güvenlik duvarını atlamak için İş Yatırım tablolarını okur.
+Mimari: Kuantum Radar V7.1 (İş Yatırım Debug Modu + Akıllı Excel Muhasebe)
+Yetki: TEFAS güvenlik duvarını atlamak için İş Yatırım tablolarını okur. Hataları gizlemez, raporlar.
 """
 
 import telebot
@@ -35,7 +35,7 @@ GUNUN_FIRSATLARI = {
     "MAKRO": "Veriler toplanıyor...",
     "ABD": "Geniş piyasa taraması devam ediyor...",
     "BIST": "Geniş BIST taraması devam ediyor...",
-    "TEFAS": "İş Yatırım üzerinden fon verileri taranıyor..."
+    "TEFAS": "İş Yatırım verileri taranıyor..."
 }
 
 NEGATIF_KELIMELER = ["savaş", "kriz", "düşüş", "iflas", "dava", "faiz artış", "zarar", "gerginlik", "satış", "çöküş"]
@@ -43,7 +43,7 @@ POZITIF_KELIMELER = ["rekor", "kar", "büyüme", "anlaşma", "faiz indirim", "y�
 
 @app.route('/')
 def index():
-    return "Kuantum Motoru V7 (İş Yatırım Modülü) Devrede!"
+    return "Kuantum Motoru V7.1 (Debug Modu) Devrede!"
 
 # --- 2. DUYGU ANALİZİ (HABER OKUMA) ---
 def haber_duygusu_olc(ticker, is_us=True):
@@ -119,40 +119,34 @@ def golge_tarayici():
             GUNUN_FIRSATLARI["MAKRO"] = makro
             
             # ========================================================
-            # 2. TEFAS -> İŞ YATIRIM İSTİHBARATI
+            # 2. İŞ YATIRIM İSTİHBARATI (DEBUG MODU AKTİF)
             # ========================================================
             try:
-                is_yatirim_url = "https://www.isyatirim.com.tr/tr-tr/analiz/fon/Sayfalar/Tarihsel-Fiyat-Getiri.aspx"
-                headers_is = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                is_yatirim_url = "https://www.isyatirim.com.tr/tr-tr/analiz/fon/Sayfalar/default.aspx"
+                headers_is = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
                 
-                # 10 Saniye içinde sayfayı çek
                 r = scraper.get(is_yatirim_url, headers=headers_is, timeout=10)
                 
-                # Sitedeki HTML tablolarını pandas ile oku
+                # Tablo okuma denemesi
                 df_list = pd.read_html(r.text, decimal=',', thousands='.')
-                df = df_list[0] # Sayfadaki ilk ana tablo
+                df = df_list[0] 
                 
-                # Tablodaki en sağdaki (Genellikle Günlük Getiri) sütununu bul
                 son_sutun = df.columns[-1]
-                
-                # İçinde % işareti falan varsa temizle ve sayıya çevir
                 df[son_sutun] = pd.to_numeric(df[son_sutun].astype(str).str.replace('%', ''), errors='coerce')
-                
-                # Sıfırdan küçük (düşen) fonları bul, en çok düşenden sırala, ilk 3'ü al
                 dusenler = df[df[son_sutun] < 0].sort_values(by=son_sutun, ascending=True).head(3)
                 
                 if not dusenler.empty:
-                    tefas_metin = "🚨 DİPTEKİ FON FIRSATLARI (İş Yatırım Radar)\n"
+                    tefas_metin = "🚨 DİPTEKİ FON FIRSATLARI (İş Yatırım)\n"
                     for index, row in dusenler.iterrows():
-                        # Fon ismini çok uzun olmasın diye 20 karakterle sınırla
                         fon_adi = str(row[0])[:20] 
                         tefas_metin += f"📉 {fon_adi}... : %{row[son_sutun]:.2f}\n"
                     GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
                 else:
                     GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün sert düşen bir fon fırsatı yok."
+                    
             except Exception as e:
-                # Tablo yüklenemezse veya site bakımdaysa çökmeyi engelle
-                GUNUN_FIRSATLARI["TEFAS"] = "➖ İş Yatırım verileri şu an güncelleniyor (Bekleniyor)."
+                # DİKKAT: HATA GİZLENMİYOR, TELEGRAM'A BASILIYOR!
+                GUNUN_FIRSATLARI["TEFAS"] = f"⚠️ İŞ YATIRIM HATA DETAYI: {str(e)}"
 
             # 3. BIST 
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE"]
@@ -170,14 +164,14 @@ def golge_tarayici():
 
 # --- 5. RAPORLAMA VE MUHASEBE MERKEZİ ---
 def radar_raporu_hazirla():
-    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V7 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V7.1 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n\n"
     rapor += "🇺🇸 GLOBAL FIRSAT (Teknik + Haber)\n"
     rapor += f"{GUNUN_FIRSATLARI['ABD']}\n\n"
     rapor += "🇹🇷 LOKAL FIRSAT (Teknik + Haber)\n"
     rapor += f"{GUNUN_FIRSATLARI['BIST']}\n\n"
-    rapor += "📊 FON FIRSATI (TEFAS & İŞ YATIRIM)\n"
+    rapor += "📊 FON FIRSATI (İŞ YATIRIM)\n"
     rapor += f"{GUNUN_FIRSATLARI['TEFAS']}\n"
     rapor += "----------------------------------\n"
     rapor += "👉 İşlemlerini aracı kurumundan hedeflere göre girebilirsin."
@@ -226,7 +220,7 @@ def excel_kayit_yap(message):
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
-        bot.reply_to(message, "⏳ Piyasalar taranıyor... İş Yatırım verileri çekiliyor...")
+        bot.reply_to(message, "⏳ Piyasalar taranıyor... İş Yatırım'dan veri çekiliyor...")
         rapor_gonder(message.chat.id)
     except Exception as e:
         bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
@@ -244,7 +238,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V7 DEVREDE | Piyasalar Koklanıyor...")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V7.1 DEVREDE | Piyasalar Koklanıyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
