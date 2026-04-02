@@ -1,8 +1,8 @@
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: Eylül'ün 2027 Robert Kolej Fonu
-Mimari: Kuantum Radar V5 (Cloudscraper Delici + ID Korumalı Excel)
-Yetki: TEFAS güvenlik duvarını delmeye çalışır, donmaları önler ve hayalet Excel dosyası yaratmaz.
+Mimari: Kuantum Radar V6 (Akıllı Filtreli Muhasebe + Tam Kamuflaj TEFAS)
+Yetki: Kullanıcı hatalarını tolere eder, komutları Excel'e yazmaz.
 """
 
 import telebot
@@ -13,7 +13,7 @@ import pandas as pd
 import requests
 import feedparser
 import gspread 
-import cloudscraper # SİBER DUVAR DELİCİ EKLENDİ
+import cloudscraper 
 import time
 import datetime
 import threading
@@ -27,8 +27,14 @@ CHAT_ID = "967303324"
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# Tüm internet bağlantılarını standart requests yerine Cloudflare Delici ile yapacağız
-scraper = cloudscraper.create_scraper()
+# TEFAS için en üst düzey kamuflaj (Gerçek bir Windows bilgisayar taklidi)
+scraper = cloudscraper.create_scraper(
+    browser={
+        'browser': 'chrome',
+        'platform': 'windows',
+        'desktop': True
+    }
+)
 
 GUNUN_FIRSATLARI = {
     "MAKRO": "Veriler toplanıyor...",
@@ -42,7 +48,7 @@ POZITIF_KELIMELER = ["rekor", "kar", "büyüme", "anlaşma", "faiz indirim", "y�
 
 @app.route('/')
 def index():
-    return "Kuantum Motoru V5 (Ağır Silahlı) Devrede!"
+    return "Kuantum Motoru V6 Devrede!"
 
 # --- 2. DUYGU ANALİZİ (HABER OKUMA - Zaman Korumalı) ---
 def haber_duygusu_olc(ticker, is_us=True):
@@ -52,7 +58,6 @@ def haber_duygusu_olc(ticker, is_us=True):
         else:
             rss_url = "https://www.ekonomim.com/rss"
         
-        # 5 Saniye kilitlenme koruması ve scraper kullanıldı
         res = scraper.get(rss_url, timeout=5)
         feed = feedparser.parse(res.content)
         puan = 0
@@ -87,7 +92,7 @@ def kuantum_analiz_yap(symbol, screener, exchange, is_us=True):
 
         if rsi < 30:
             if duygu == "NEGATİF 📉":
-                aksiyon = "⚠️ TEKNİK DİPTE AMA HABER KÖTÜ (Bıçak Düşüyor, Bekle)"
+                aksiyon = "⚠️ TEKNİK DİPTE AMA HABER KÖTÜ (Bekle)"
             else:
                 aksiyon = "🚀 DİPTE! GÜÇLÜ ALIM veya PUT SAT."
             return f"🟢 {symbol}: {fiyat:.2f} | RSI: {rsi:.1f} | Haber: {duygu}\n   └ 🛠 Karar: {aksiyon}\n   └ 🎯 Hedef: {direnc:.2f} | 🛑 Stop: {destek:.2f}"
@@ -118,7 +123,7 @@ def golge_tarayici():
             makro = f"💎 VIX KORKU ENDEKSİ: {vix:.2f} " + ("(YÜKSEK! KAN VAR 🚨)" if vix > 25 else "(Stabil ⚖️)")
             GUNUN_FIRSATLARI["MAKRO"] = makro
             
-            # 2. TEFAS (Cloudscraper Delici Kullanılıyor)
+            # 2. TEFAS (Son Kamuflaj Denemesi)
             try:
                 url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
@@ -132,7 +137,6 @@ def golge_tarayici():
                     "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx"
                 }
                 
-                # scraper.post kullanarak siber duvarı delmeyi deniyoruz. 10 saniye sabır süresi.
                 res = scraper.post(url, data=payload, headers=headers, timeout=10)
                 
                 if res.status_code == 200:
@@ -152,16 +156,16 @@ def golge_tarayici():
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
                 else:
-                    GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS güvenlik duvarı isteği reddetti (Kod: {res.status_code})."
+                    GUNUN_FIRSATLARI["TEFAS"] = f"➖ TEFAS yurtdışı IP engeli uyguluyor (Kod: {res.status_code})."
             except Exception as e:
-                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS bağlantısı 10 saniyeyi aştığı için (donmamak adına) pas geçildi."
+                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS bağlantısı reddedildi (Yurtdışı Bulut Engeli)."
 
-            # 3. BIST (Teknik + Duygu)
+            # 3. BIST 
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE"]
             bist_sonuclar = [kuantum_analiz_yap(h, "turkey", "BIST", False) for h in bist_hisseler]
             GUNUN_FIRSATLARI["BIST"] = "\n".join(filter(None, bist_sonuclar[:5])) or "➖ Ekstrem fırsat yok."
 
-            # 4. ABD (Teknik + Duygu)
+            # 4. ABD 
             abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL"]
             abd_sonuclar = [kuantum_analiz_yap(h, "america", "NASDAQ", True) for h in abd_hisseler]
             GUNUN_FIRSATLARI["ABD"] = "\n".join(filter(None, abd_sonuclar[:5])) or "➖ Ekstrem fırsat yok."
@@ -172,7 +176,7 @@ def golge_tarayici():
 
 # --- 5. RAPORLAMA VE MUHASEBE MERKEZİ ---
 def radar_raporu_hazirla():
-    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V5 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V6 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n\n"
     rapor += "🇺🇸 GLOBAL FIRSAT (Teknik + Haber)\n"
@@ -202,8 +206,13 @@ def rapor_gonder(hedef_chat_id):
     except Exception as e:
         bot.send_message(hedef_chat_id, f"⚠️ KOD HATASI: {e}")
 
-# YENİ EKLENDİ: Hayalet Dosya İhtimalini Bitiren ID Bağlantısı
+# YENİ EKLENDİ: Akıllı Filtre (Komutları Reddet)
 def excel_kayit_yap(message):
+    # Eğer kullanıcı hisse adı yerine '/' ile başlayan bir komut girerse:
+    if message.text.startswith('/'):
+        bot.reply_to(message, "⚠️ HATA: Hisse adı yerine bir komut girdin. Kayıt işlemi iptal edildi.")
+        return # İşlemi durdur, Excel'e yazma
+        
     try:
         gc = gspread.service_account(filename='creds.json')
         
@@ -224,7 +233,7 @@ def excel_kayit_yap(message):
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
-        bot.reply_to(message, "⏳ Piyasalar taranıyor... TEFAS zırhı test ediliyor...")
+        bot.reply_to(message, "⏳ Piyasalar taranıyor...")
         rapor_gonder(message.chat.id)
     except Exception as e:
         bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
@@ -232,6 +241,7 @@ def manuel_rapor_gonder(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.data == "onay":
+        # Bot işlemi kaydetmek için kullanıcıdan GERÇEK bir metin bekler
         msg = bot.send_message(call.message.chat.id, "Harika! 📝 Muhasebeye kaydetmem için aldığın hisseyi/fonu ve fiyatı yaz patron.\n(Örn: THYAO 290 TL'den 100 lot alındı)")
         bot.register_next_step_handler(msg, excel_kayit_yap)
     else:
@@ -242,7 +252,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V5 DEVREDE | Piyasalar Koklanıyor...")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V6 DEVREDE | Piyasalar Koklanıyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
