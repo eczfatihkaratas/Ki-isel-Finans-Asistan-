@@ -6,3 +6,4 @@ pandas
 requests
 feedparser
 gspread
+cloudscraper
