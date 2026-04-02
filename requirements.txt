@@ -5,3 +5,4 @@ tradingview_ta
 pandas
 requests
 feedparser
+gspread
