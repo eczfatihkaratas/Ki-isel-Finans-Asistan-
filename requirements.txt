@@ -4,3 +4,4 @@ flask
 tradingview_ta
 pandas
 requests
+feedparser
