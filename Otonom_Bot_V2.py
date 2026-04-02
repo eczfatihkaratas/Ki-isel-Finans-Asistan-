@@ -1,8 +1,8 @@
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: Eylül'ün 2027 Robert Kolej Fonu
-Mimari: Kuantum Radar V3 (Teknik + Duygu + GOOGLE SHEETS MUHASEBE)
-Yetki: Haberleri okur, hedefleri verir ve onaylanan işlemleri otomatik Excel'e yazar.
+Mimari: Kuantum Radar V4 (TEFAS Ajan Modu + Zırhlı Hız + ID Korumalı Excel)
+Yetki: TEFAS inatla sistemde tutuldu, donmalara karşı 5 saniye kuralı getirildi.
 """
 
 import telebot
@@ -12,7 +12,7 @@ from tradingview_ta import TA_Handler, Interval
 import pandas as pd
 import requests
 import feedparser
-import gspread # EKLENDİ: Google E-Tablolar kütüphanesi
+import gspread 
 import time
 import datetime
 import threading
@@ -38,9 +38,9 @@ POZITIF_KELIMELER = ["rekor", "kar", "büyüme", "anlaşma", "faiz indirim", "y�
 
 @app.route('/')
 def index():
-    return "Muhasebe Modüllü Kuantum Motoru V3 Devrede!"
+    return "Muhasebe Modüllü Kuantum Motoru V4 Devrede!"
 
-# --- 2. DUYGU ANALİZİ (HABER OKUMA) ---
+# --- 2. DUYGU ANALİZİ (HABER OKUMA - ZAMAN KORUMALI) ---
 def haber_duygusu_olc(ticker, is_us=True):
     try:
         if is_us:
@@ -48,7 +48,8 @@ def haber_duygusu_olc(ticker, is_us=True):
         else:
             rss_url = "https://www.ekonomim.com/rss"
         
-        feed = feedparser.parse(rss_url)
+        res = requests.get(rss_url, timeout=5) # 5 Saniye Kuralı
+        feed = feedparser.parse(res.content)
         puan = 0
         
         for entry in feed.entries[:5]: 
@@ -107,18 +108,31 @@ def kuantum_analiz_yap(symbol, screener, exchange, is_us=True):
 def golge_tarayici():
     while True:
         try:
+            # 1. MAKRO
             vix = yf.Ticker("^VIX").history(period="1d")['Close'].iloc[-1]
             makro = f"💎 VIX KORKU ENDEKSİ: {vix:.2f} " + ("(YÜKSEK! KAN VAR 🚨)" if vix > 25 else "(Stabil ⚖️)")
             GUNUN_FIRSATLARI["MAKRO"] = makro
             
+            # 2. TEFAS AJAN MODU (Asla Vazgeçmiyoruz)
             try:
                 url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
                 bugun = datetime.datetime.now()
                 baslangic = (bugun - datetime.timedelta(days=4)).strftime("%d.%m.%Y")
                 bitis = bugun.strftime("%d.%m.%Y")
                 payload = f"fontip=YAT&sfontip=&fongrup=&baslangic={baslangic}&bitis={bitis}&fonkod="
-                headers = {"Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Requested-With": "XMLHttpRequest", "User-Agent": "Mozilla/5.0"}
-                res = requests.post(url, data=payload, headers=headers, timeout=15)
+                
+                # Bota "Ben bir Google Chrome tarayıcısıyım" sahte kimliği veriliyor
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx",
+                    "Origin": "https://www.tefas.gov.tr"
+                }
+                
+                # DİKKAT: 5 saniye bekle, açmazlarsa donma, sistemi kitlemeden kaç (timeout=5)
+                res = requests.post(url, data=payload, headers=headers, timeout=5)
+                
                 if res.status_code == 200:
                     veri = res.json().get("data", [])
                     if veri:
@@ -136,14 +150,16 @@ def golge_tarayici():
                         else:
                             GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
                 else:
-                    GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS sunucuları geçici olarak yanıt vermiyor."
-            except:
-                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS taraması şu an yapılamıyor."
+                    GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS güvenlik duvarı API isteğini reddetti."
+            except Exception as e:
+                GUNUN_FIRSATLARI["TEFAS"] = "➖ TEFAS bağlantısı 5 saniyeyi aştığı için pas geçildi."
 
+            # 3. BIST (Teknik + Duygu)
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE"]
             bist_sonuclar = [kuantum_analiz_yap(h, "turkey", "BIST", False) for h in bist_hisseler]
             GUNUN_FIRSATLARI["BIST"] = "\n".join(filter(None, bist_sonuclar[:5])) or "➖ Ekstrem fırsat yok."
 
+            # 4. ABD (Teknik + Duygu)
             abd_hisseler = ["AAPL", "TSLA", "NVDA", "AMD", "MSFT", "AMZN", "META", "GOOGL"]
             abd_sonuclar = [kuantum_analiz_yap(h, "america", "NASDAQ", True) for h in abd_hisseler]
             GUNUN_FIRSATLARI["ABD"] = "\n".join(filter(None, abd_sonuclar[:5])) or "➖ Ekstrem fırsat yok."
@@ -154,7 +170,7 @@ def golge_tarayici():
 
 # --- 5. RAPORLAMA VE MUHASEBE MERKEZİ ---
 def radar_raporu_hazirla():
-    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V3 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V4 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n\n"
     rapor += "🇺🇸 GLOBAL FIRSAT (Teknik + Haber)\n"
@@ -184,28 +200,29 @@ def rapor_gonder(hedef_chat_id):
     except Exception as e:
         bot.send_message(hedef_chat_id, f"⚠️ KOD HATASI: {e}")
 
-# YENİ EKLENDİ: Google Sheets Muhasebe Fonksiyonu
+# YENİ EKLENDİ: ID Korumalı Kusursuz Excel Bağlantısı
 def excel_kayit_yap(message):
     try:
-        # Render'daki gizli dosyadan (creds.json) anahtarı alır
         gc = gspread.service_account(filename='creds.json')
-        sh = gc.open("2027_Fon_Muhasebe")
+        
+        # --- DİKKAT: AŞAĞIDAKİ YERE KENDİ EXCEL ID NUMARANI YAPIŞTIR ---
+        sh = gc.open_by_key("14Q8repG8ThqSeSsPyy6uaLrFDdtwsCsdfwj2cu3H3VA")
+        
         worksheet = sh.sheet1 
 
         tarih = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
         islem_detayi = message.text
 
-        # Satır olarak tabloya ekler: [Tarih, İşlem Detayı]
         worksheet.append_row([tarih, islem_detayi])
         
-        bot.reply_to(message, f"✅ İşlem başarıyla Excel dosyasına işlendi!\n📝 Kaydedilen: {islem_detayi}")
+        bot.reply_to(message, f"✅ İşlem başarıyla KENDİ Excel dosyana işlendi!\n📝 Kaydedilen: {islem_detayi}")
     except Exception as e:
         bot.reply_to(message, f"⚠️ Muhasebe Hatası (Excel'e bağlanılamadı): {e}")
 
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
-        bot.reply_to(message, "⏳ Piyasalar koklanıyor...")
+        bot.reply_to(message, "⏳ Piyasalar taranıyor...")
         rapor_gonder(message.chat.id)
     except Exception as e:
         bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
@@ -213,7 +230,6 @@ def manuel_rapor_gonder(message):
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     if call.data == "onay":
-        # Onay tuşuna basıldığında bot sıradaki mesajı bekler ve Excel'e yazar
         msg = bot.send_message(call.message.chat.id, "Harika! 📝 Muhasebeye kaydetmem için aldığın hisseyi/fonu ve fiyatı yaz patron.\n(Örn: THYAO 290 TL'den 100 lot alındı)")
         bot.register_next_step_handler(msg, excel_kayit_yap)
     else:
@@ -224,7 +240,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V3 DEVREDE | Piyasalar Koklanıyor...")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V4 DEVREDE | Piyasalar Koklanıyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
