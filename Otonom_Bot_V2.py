@@ -1,8 +1,8 @@
 """
 PROJE FELSEFESİ VE HAFIZA BLOĞU:
 Hedef: Eylül'ün 2027 Robert Kolej Fonu
-Mimari: Kuantum Radar V7.1 (İş Yatırım Debug Modu + Akıllı Excel Muhasebe)
-Yetki: TEFAS güvenlik duvarını atlamak için İş Yatırım tablolarını okur. Hataları gizlemez, raporlar.
+Mimari: Kuantum Radar V9 (ScraperAPI Hayalet IP + Mühürlü Muhasebe)
+Yetki: TEFAS güvenlik duvarını aşmak için Residential Proxy kullanır.
 """
 
 import telebot
@@ -35,7 +35,7 @@ GUNUN_FIRSATLARI = {
     "MAKRO": "Veriler toplanıyor...",
     "ABD": "Geniş piyasa taraması devam ediyor...",
     "BIST": "Geniş BIST taraması devam ediyor...",
-    "TEFAS": "İş Yatırım verileri taranıyor..."
+    "TEFAS": "Hayalet IP ile TEFAS sızma operasyonu bekleniyor..."
 }
 
 NEGATIF_KELIMELER = ["savaş", "kriz", "düşüş", "iflas", "dava", "faiz artış", "zarar", "gerginlik", "satış", "çöküş"]
@@ -43,7 +43,7 @@ POZITIF_KELIMELER = ["rekor", "kar", "büyüme", "anlaşma", "faiz indirim", "y�
 
 @app.route('/')
 def index():
-    return "Kuantum Motoru V7.1 (Debug Modu) Devrede!"
+    return "Kuantum Motoru V9 (Hayalet IP Zırhı) Devrede!"
 
 # --- 2. DUYGU ANALİZİ (HABER OKUMA) ---
 def haber_duygusu_olc(ticker, is_us=True):
@@ -119,34 +119,54 @@ def golge_tarayici():
             GUNUN_FIRSATLARI["MAKRO"] = makro
             
             # ========================================================
-            # 2. İŞ YATIRIM İSTİHBARATI (DEBUG MODU AKTİF)
+            # 2. HAYALET IP (ScraperAPI) İLE TEFAS SIZMA OPERASYONU
             # ========================================================
             try:
-                is_yatirim_url = "https://www.isyatirim.com.tr/tr-tr/analiz/fon/Sayfalar/default.aspx"
-                headers_is = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                # PATRONUN HAYALET IP ANAHTARI MÜHÜRLENDİ
+                SCRAPER_API_KEY = "bba6349b5595e91b0baa3fd8b4da0933"
                 
-                r = scraper.get(is_yatirim_url, headers=headers_is, timeout=10)
+                # Hayalet Proxy Ayarları
+                hayalet_proxy = {
+                    "http": f"http://scraperapi:{SCRAPER_API_KEY}@proxy-server.scraperapi.com:8001",
+                    "https": f"http://scraperapi:{SCRAPER_API_KEY}@proxy-server.scraperapi.com:8001"
+                }
                 
-                # Tablo okuma denemesi
-                df_list = pd.read_html(r.text, decimal=',', thousands='.')
-                df = df_list[0] 
+                url = "https://www.tefas.gov.tr/api/profile/boz/getHistory"
+                bugun = datetime.datetime.now()
+                baslangic = (bugun - datetime.timedelta(days=4)).strftime("%d.%m.%Y")
+                bitis = bugun.strftime("%d.%m.%Y")
                 
-                son_sutun = df.columns[-1]
-                df[son_sutun] = pd.to_numeric(df[son_sutun].astype(str).str.replace('%', ''), errors='coerce')
-                dusenler = df[df[son_sutun] < 0].sort_values(by=son_sutun, ascending=True).head(3)
+                payload = f"fontip=YAT&sfontip=&fongrup=&baslangic={baslangic}&bitis={bitis}&fonkod="
+                headers = {
+                    "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Referer": "https://www.tefas.gov.tr/FonKarsilastirma.aspx"
+                }
                 
-                if not dusenler.empty:
-                    tefas_metin = "🚨 DİPTEKİ FON FIRSATLARI (İş Yatırım)\n"
-                    for index, row in dusenler.iterrows():
-                        fon_adi = str(row[0])[:20] 
-                        tefas_metin += f"📉 {fon_adi}... : %{row[son_sutun]:.2f}\n"
-                    GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
+                # ScraperAPI üzerinden bağlanıyoruz (Timeout süresi proxy için uzun tutuldu)
+                res = requests.post(url, data=payload, headers=headers, proxies=hayalet_proxy, verify=False, timeout=30)
+                
+                if res.status_code == 200:
+                    veri = res.json().get("data", [])
+                    if veri:
+                        df = pd.DataFrame(veri)
+                        df['GÜNLÜK GETİRİ'] = pd.to_numeric(df['GÜNLÜK GETİRİ'], errors='coerce')
+                        df_dusenler = df[df['GÜNLÜK GETİRİ'] < 0]
+                        en_cok_dusenler = df_dusenler.sort_values(by="GÜNLÜK GETİRİ", ascending=True).head(3)
+                        
+                        tefas_metin = "🚨 DİPTEKİ FON FIRSATLARI (Hayalet IP Radar)\n"
+                        if not en_cok_dusenler.empty:
+                            for index, row in en_cok_dusenler.iterrows():
+                                fon_ismi = str(row.get('FON KODU', 'FON'))
+                                tefas_metin += f"📉 {fon_ismi}: %{row['GÜNLÜK GETİRİ']:.2f}\n"
+                            GUNUN_FIRSATLARI["TEFAS"] = tefas_metin
+                        else:
+                            GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün TEFAS'ta sert düşen bir fon fırsatı yok."
                 else:
-                    GUNUN_FIRSATLARI["TEFAS"] = "➖ Bugün sert düşen bir fon fırsatı yok."
+                    GUNUN_FIRSATLARI["TEFAS"] = f"⚠️ Hayalet IP Engeli (Kod: {res.status_code})."
                     
             except Exception as e:
-                # DİKKAT: HATA GİZLENMİYOR, TELEGRAM'A BASILIYOR!
-                GUNUN_FIRSATLARI["TEFAS"] = f"⚠️ İŞ YATIRIM HATA DETAYI: {str(e)}"
+                GUNUN_FIRSATLARI["TEFAS"] = f"⚠️ Hayalet IP Bağlantı Hatası: {str(e)}"
 
             # 3. BIST 
             bist_hisseler = ["THYAO", "TUPRS", "ISCTR", "KCHOL", "EREGL", "ASELS", "BIMAS", "SAHOL", "AKBNK", "SISE"]
@@ -164,14 +184,14 @@ def golge_tarayici():
 
 # --- 5. RAPORLAMA VE MUHASEBE MERKEZİ ---
 def radar_raporu_hazirla():
-    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V7.1 🎯\n"
+    rapor = "🎯 ZEKİ ASİSTAN: KUANTUM RADAR V9 🎯\n"
     rapor += "----------------------------------\n\n"
     rapor += f"{GUNUN_FIRSATLARI['MAKRO']}\n\n"
     rapor += "🇺🇸 GLOBAL FIRSAT (Teknik + Haber)\n"
     rapor += f"{GUNUN_FIRSATLARI['ABD']}\n\n"
     rapor += "🇹🇷 LOKAL FIRSAT (Teknik + Haber)\n"
     rapor += f"{GUNUN_FIRSATLARI['BIST']}\n\n"
-    rapor += "📊 FON FIRSATI (İŞ YATIRIM)\n"
+    rapor += "📊 FON FIRSATI (HAYALET IP İLE TEFAS)\n"
     rapor += f"{GUNUN_FIRSATLARI['TEFAS']}\n"
     rapor += "----------------------------------\n"
     rapor += "👉 İşlemlerini aracı kurumundan hedeflere göre girebilirsin."
@@ -220,7 +240,8 @@ def excel_kayit_yap(message):
 @bot.message_handler(commands=['rapor'])
 def manuel_rapor_gonder(message):
     try:
-        bot.reply_to(message, "⏳ Piyasalar taranıyor... İş Yatırım'dan veri çekiliyor...")
+        # Uyarı: Proxy üzerinden geçmek 5-10 saniye sürebilir
+        bot.reply_to(message, "⏳ Piyasalar taranıyor... Hayalet IP zırhı giyiliyor (Bu işlem tünel bağlantısı sebebiyle 10 saniye sürebilir)...")
         rapor_gonder(message.chat.id)
     except Exception as e:
         bot.reply_to(message, f"⚠️ KOMUT HATASI: {str(e)}")
@@ -238,7 +259,7 @@ def zamanlayici():
         simdi = datetime.datetime.now().strftime("%H:%M")
         if simdi == "16:30" or simdi == "17:45":
             try:
-                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V7.1 DEVREDE | Piyasalar Koklanıyor...")
+                bot.send_message(CHAT_ID, "🔔 KUANTUM RADARI V9 DEVREDE | Piyasalar Koklanıyor...")
                 rapor_gonder(CHAT_ID)
             except:
                 pass
